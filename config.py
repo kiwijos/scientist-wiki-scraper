@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     target_article_count: int = 200
 
     # Request Settings
-    user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    user_agent: str = "ScientistScraper/1.0 (https://gitlab.lnu.se/2dv515/student/al227qz/project; al227qz@student.lnu.se)"
     request_timeout: int = 10  # seconds
     min_delay: float = 1.5     # seconds
     max_delay: float = 3.0     # seconds
