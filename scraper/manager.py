@@ -60,19 +60,20 @@ def get_collected_count() -> int:
 
 def main() -> None:
     parser_args = argparse.ArgumentParser(description="Wikipedia Scientist Scraper")
-    parser_args.add_argument('--count', type=int, default=settings.target_article_count, help='Target number of articles')
+    parser_args.add_argument('--count', type=int, default=settings.target_article_count, help='Number of articles to collect in this run')
     args = parser_args.parse_args()
 
     pipeline.create_directories()
     crawler = Crawler()
     
-    target_count: int = args.count
-    logger.info(f"Starting crawl. Target: {target_count} articles.")
+    session_target: int = args.count
+    session_collected: int = 0
+    
+    logger.info(f"Starting crawl. Target for this session: {session_target} articles.")
     
     while True:
-        current_count = get_collected_count()
-        if current_count >= target_count:
-            logger.info(f"Reached target {target_count}. Stopping.")
+        if session_collected >= session_target:
+            logger.info(f"Reached session target {session_target}. Stopping.")
             break
             
         url = crawler.get_next_url()
@@ -116,7 +117,9 @@ def main() -> None:
             crawler.mark_completed(url)
             crawler.save_progress()
             
-            logger.info(f"Completed {url}. Collected: {current_count + 1}/{target_count}")
+            session_collected += 1
+            total_collected = get_collected_count()
+            logger.info(f"Completed {url}. Session: {session_collected}/{session_target} (Total saved: {total_collected})")
             
         except KeyboardInterrupt:
             logger.info("Stopping...")
