@@ -53,9 +53,24 @@ def fetch_with_retry(url: str, max_retries: int = settings.max_retries) -> reque
             
             if should_retry:
                 wait_time = min(backoff, settings.max_backoff)
+                increment_backoff = True
+                
+                # Check for Retry-After header
+                if isinstance(e, HTTPError) and e.response.status_code in [429, 503]:
+                    retry_after = e.response.headers.get("Retry-After")
+                    if retry_after:
+                        try:
+                            wait_time = int(retry_after)
+                            logger.warning(f"Server requested wait of {wait_time}s via Retry-After")
+                            increment_backoff = False
+                        except ValueError:
+                            pass # Fallback to standard backoff
+
                 logger.warning(f"Error fetching {url}: {e}. Retrying in {wait_time}s")
                 time.sleep(wait_time)
-                backoff *= 2
+                
+                if increment_backoff:
+                    backoff *= 2
             else:
                 raise
     raise Exception("Unreachable code") 
