@@ -68,6 +68,8 @@ def main() -> None:
     
     session_target: int = args.count
     session_collected: int = 0
+
+    total_collected = get_collected_count()
     
     logger.info(f"Starting crawl. Target for this session: {session_target} articles.")
     
@@ -101,8 +103,8 @@ def main() -> None:
                 # If it's not a scientist, delete it.
                 try:
                     os.remove(raw_path)
-                except Exception:
-                    pass
+                except OSError as e:
+                    logger.warning(f"Could not delete non-scientist file {raw_path}: {e}")
                 continue
                 
             # Parse
@@ -118,7 +120,7 @@ def main() -> None:
             crawler.save_progress()
             
             session_collected += 1
-            total_collected = get_collected_count()
+            total_collected += 1
             logger.info(f"Completed {url}. Session: {session_collected}/{session_target} (Total saved: {total_collected})")
             
         except KeyboardInterrupt:
