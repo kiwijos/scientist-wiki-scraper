@@ -72,65 +72,67 @@ def main() -> None:
     total_collected = get_collected_count()
     
     logger.info(f"Starting crawl. Target for this session: {session_target} articles.")
-    
-    while True:
-        if session_collected >= session_target:
-            logger.info(f"Reached session target {session_target}. Stopping.")
-            break
+
+    try:
+        while True:
+            if session_collected >= session_target:
+                logger.info(f"Reached session target {session_target}. Stopping.")
+                break
+                
+            url = crawler.get_next_url()
+            if not url:
+                logger.info("Queue empty. Stopping.")
+                break
+                
+            logger.info(f"Processing {url}")
             
-        url = crawler.get_next_url()
-        if not url:
-            logger.info("Queue empty. Stopping.")
-            break
-            
-        logger.info(f"Processing {url}")
-        
-        try:
-            # Fetch
-            raw_path = fetcher.fetch_article(url)
-            if not raw_path:
-                crawler.log_failure(url, "Download failed")
+            try:
+                # Fetch
+                raw_path = fetcher.fetch_article(url)
+                if not raw_path:
+                    crawler.log_failure(url, "Download failed")
+                    crawler.mark_completed(url)
+                    continue
+                    
+                # Check if Scientist
+                if not is_scientist_article(raw_path):
+                    logger.debug(f"Skipping {url} - does not appear to be a scientist.")
+                    # We mark as completed (visited) so we don't try again
+                    crawler.mark_completed(url)
+                    
+                    # If it's not a scientist, delete it.
+                    try:
+                        os.remove(raw_path)
+                    except OSError as e:
+                        logger.warning(f"Could not delete non-scientist file {raw_path}: {e}")
+                    continue
+                    
+                # Parse
+                words, links = parser.parse_article(raw_path)
+                
+                # Save Processed
+                article_slug = fetcher.extract_slug(url)
+                pipeline.save_processed_data(article_slug, words, links)
+                
+                # Update Crawler
+                crawler.add_urls(links)
                 crawler.mark_completed(url)
-                continue
                 
-            # Check if Scientist
-            if not is_scientist_article(raw_path):
-                logger.debug(f"Skipping {url} - does not appear to be a scientist.")
-                # We mark as completed (visited) so we don't try again
-                crawler.mark_completed(url) 
-                crawler.save_progress()
-                
-                # If it's not a scientist, delete it.
-                try:
-                    os.remove(raw_path)
-                except OSError as e:
-                    logger.warning(f"Could not delete non-scientist file {raw_path}: {e}")
-                continue
-                
-            # Parse
-            words, links = parser.parse_article(raw_path)
-            
-            # Save Processed
-            article_slug = fetcher.extract_slug(url)
-            pipeline.save_processed_data(article_slug, words, links)
-            
-            # Update Crawler
-            crawler.add_urls(links)
-            crawler.mark_completed(url)
-            crawler.save_progress()
-            
-            session_collected += 1
-            total_collected += 1
-            logger.info(f"Completed {url}. Session: {session_collected}/{session_target} (Total saved: {total_collected})")
-            
-        except KeyboardInterrupt:
-            logger.info("Stopping...")
-            break
-        except Exception as e:
-            logger.error(f"Error processing {url}: {e}")
-            crawler.log_failure(url, str(e))
-            crawler.mark_completed(url) # Mark tried
-            crawler.save_progress()
+                session_collected += 1
+                total_collected += 1
+                logger.info(f"Completed {url}. Session: {session_collected}/{session_target} (Total saved: {total_collected})")
+
+            except Exception as e:
+                logger.error(f"Error processing {url}: {e}")
+                crawler.log_failure(url, str(e))
+                crawler.mark_completed(url) # Mark tried
+
+    except KeyboardInterrupt:
+        logger.info("Interrupted by user")
+    
+    finally:
+        crawler.save_progress()
+        logger.info(f"Saved progress. Collected {session_collected} articles this session.")
 
 if __name__ == "__main__":
     main()
